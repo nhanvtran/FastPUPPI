@@ -53,7 +53,7 @@ process.extraPFStuff.add(
 )
 
 def monitorPerf(label, tag, makeResp=True, makeRespSplit=True, makeJets=True, makeMET=True, makeCentralMET=True, makeBarrelMET=True,
-                makeInputMultiplicities=False, makeOutputMultiplicities=False):
+                makeInputMultiplicities=False, makeOutputMultiplicities=False, saveCands=False):
     def _add(name, what):
         setattr(process, name, what)
         process.extraPFStuff.add(what)
@@ -74,6 +74,8 @@ def monitorPerf(label, tag, makeResp=True, makeRespSplit=True, makeJets=True, ma
     if makeJets:
         _add('ak4'+label, ak4PFJets.clone(src = tag, doAreaFastjet = False))
         setattr(process.l1pfjetTable.jets, label, cms.InputTag('ak4'+label))
+    if saveCands:
+        setattr(process.l1pfcandTable.cands, label, cms.InputTag(tag))
     if makeMET:
         _add('met'+label, pfMet.clone(src = tag, calculateSignificance = False))
         setattr(process.l1pfmetTable.mets, label, cms.InputTag('met'+label))
@@ -129,6 +131,17 @@ process.l1pfjetTable = cms.EDProducer("L1PFJetTableProducer",
     ),
 )
 
+process.l1pfcandTable = cms.EDProducer("L1PFCandTableProducer",
+    commonSel = cms.string("pt > 0.0 && abs(eta) < 10.0"),
+    cands = cms.PSet(
+    ),
+    moreVariables = cms.PSet(
+        puppiWeight = cms.string("puppiWeight"),
+        pdgId = cms.string("pdgId"),
+        charge = cms.string("charge")
+    ),
+)
+
 process.l1pfmetTable = cms.EDProducer("L1PFMetTableProducer",
     genMet = cms.InputTag("genMetTrue"), 
     flavour = cms.string(""),
@@ -141,8 +154,8 @@ process.l1pfmetBarrelTable  = process.l1pfmetTable.clone(genMet = "genMetBarrelT
 monitorPerf("L1Calo", "l1pfCandidates:Calo", makeRespSplit = False)
 monitorPerf("L1TK", "l1pfCandidates:TK", makeRespSplit = False, makeJets=False, makeMET=False)
 monitorPerf("L1TKV", "l1pfCandidates:TKVtx", makeRespSplit = False, makeJets=False, makeMET=False)
-monitorPerf("L1PF", "l1pfCandidates:PF")
-monitorPerf("L1Puppi", "l1pfCandidates:Puppi")
+monitorPerf("L1PF", "l1pfCandidates:PF", saveCands=True)
+monitorPerf("L1Puppi", "l1pfCandidates:Puppi", saveCands=True)
 
 for D in ['Barrel','HF','HGCal','HGCalNoTK']:
     monitorPerf("L1%sCalo"%D,"l1pfProducer%s:Calo"%D, makeResp=False, makeRespSplit=False, makeJets=False, makeMET=False, 
@@ -221,7 +234,7 @@ process.runPF.associate(process.extraPFStuff)
 process.p = cms.Path(
         process.runPF + 
         process.ntuple + #process.content +
-        process.l1pfjetTable + 
+        process.l1pfjetTable + process.l1pfcandTable +
         process.l1pfmetTable + process.l1pfmetCentralTable + process.l1pfmetBarrelTable
         )
 process.TFileService = cms.Service("TFileService", fileName = cms.string("perfTuple.root"))
